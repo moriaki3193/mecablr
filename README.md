@@ -28,13 +28,13 @@ $ docker exec -it mecablr sh  # /mecablr ディレクトリへ
 
 ```shell
 # GETを利用する方法
-$ curl "127.0.0.1:3193/?sentence=すもももももももものうち"
+$ curl "127.0.0.1:3193/?sentence=Pythonの勉強"
 
 # POSTを利用する方法
 # クエリパラメータとして渡すには長すぎる文章を解析したい場合に利用
 $ curl "127.0.0.1:3193" \
     -H 'Content-Type:application/json' \
-    -d '{"sentence": "すもももももももものうち"}'
+    -d '{"sentence": "Pythonの勉強"}'
 ```
 
 ### response
@@ -42,7 +42,12 @@ $ curl "127.0.0.1:3193" \
 
 ```json
 {
-    "sentence": "すもももももももものうち"
+    "sentence": "Pythonの勉強",
+    "result": [
+        {"Surface": "Python", "PoS": "名詞", "PoS1": "固有名詞", "PoS2": "一般", "PoS3": "*", "VerbConjugation": "*", "Original": "*", "Reading": "Python", "Pronunciation": "パイソン"},
+        {"Surface": "の", "PoS": "助詞", "PoS1": "連体化", "PoS2": "*", "PoS3": "*", "VerbConjugation": "*", "Original": "*", "Reading": "の", "Pronunciation": "ノ"},
+        {"Surface": "勉強", "PoS": "名詞", "PoS1": "サ変接続", "PoS2": "*", "PoS3": "*", "VerbConjugation": "*", "Original": "*", "Reading": "勉強", "Pronunciation": "ベンキョウ"}
+    ]
 }
 ```
 
