@@ -7,7 +7,9 @@ MeCab
 ## usage
 ### setup
 ```shell
-$ cd /path/to/mecablr
+# リポジトリのダウンロード
+$ git clone git@github.com:moriaki3193/mecablr.git
+$ cd mecablr
 
 # イメージのビルド
 $ docker build -t mecablr .
