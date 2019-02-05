@@ -1,6 +1,12 @@
 # mecablr
 MeCab
 
+## index
+- [requirements](#requirements)
+- [usage](#usage)
+- [with-docker-compose](#with-docker-compose)
+- [[Appendix] Alpine Linux](#alpine-linux)
+
 ## requirements
 - Docker
 
@@ -52,6 +58,163 @@ $ curl "127.0.0.1:3193" \
     ]
 }
 ```
+
+## with docker-compose
+このイメージはstand-aloneで実行されるため、docker-composeを利用して他のサービスと簡単連携できます。
+以下は、docker-composeを利用してサービスを組み合わせる場合の一例です。
+
+### example
+#### ディレクトリ構成
+```
+- proj-root
+    + containers
+        + mecablr         # step.1
+        + yourapp         # step.2
+        + proxy           # step.3
+            + Dockerfile
+            + nginx.conf
+            + log
+    + docker-compose.yml  # step.4
+```
+
+#### step.1
+`proj-root/containers`で以下のコマンドを実行し、mecablrをクローンします。
+
+```shell
+$ git clone git@github.com:moriaki3193/mecablr.git
+```
+
+#### step.2
+`proj-root/containers`にあなたの作成するWebアプリケーションを設置する。
+ここにはアプリケーションそのものを置いても良いですし、イメージの定義のみをDockerfileで行い、他のプロジェクトディレクトリにおいてアプリケーションの中身を書いても良いです。
+作成するアプリケーションの規模に応じて選択してください。
+
+#### step.3
+アプリケーションの利用者がmecablrとあなたのアプリケーションを意識しなくて済むように、リバースプロキシを設定します。
+`Dockerfile`と`nginx.conf`をそれぞれ次のように設定してみましょう。
+
+##### Dockerfile
+```dockerfile
+FROM nginx
+
+CMD [ "nginx", "-g", "daemon off;", "-c", "/etc/nginx/nginx.conf" ]
+```
+
+##### nginx.conf
+```conf
+user nginx;
+worker_processes auto;
+
+error_log /var/log/nginx/error.log warn;
+pid /var/run/nginx.pid;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+
+    log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                    '$status $body_bytes_sent "$http_referer" '
+                    '"$http_user_agent" "$http_x_forwarded_for" $request_time (ms)';
+
+    access_log /var/log/nginx/access.log main;
+
+    # Define the parameters to optimize the delivery of static content.
+    sendfile on;
+    # tcp_nopush on;
+    # tcp_nodelay on;
+
+    keepalive_timeout 65;
+
+    # upstream context
+    # ROLE
+    #     バックエンドのアプリケーションサーバを示し
+    #     serverディレクティブの記述をまとめたものに名前を付与する
+    # FORMAT
+    #     upstream <backend_server_name> {
+    #         server <host_ip>:<port_number>;
+    #     }
+    upstream uwsgi {
+        server yourapp:3031;
+    }
+
+    upstream mecablr {
+        server mecablr:3032;
+    }
+
+    # server directive
+    # ROLE
+    #     外部からのアクセス方法を示す
+    #     リバースプロキシを指定する場合はproxy_passディレクティブで
+    #     転送先のupstreamの名前を指定する
+    server {
+        listen 80;
+        charset utf-8;
+
+        location / {
+            include uwsgi_params;
+            uwsgi_pass uwsgi;  # `uwsgi` upstream コンテキストを参照する
+        }
+
+        location /macablr {
+            include uwsgi_params;
+            uwsgi_pass mecablr;
+        }
+
+        location = /favicon.ico {
+            empty_gif;
+        }
+    }
+}
+```
+
+#### step.4
+最後に複数のコンテナをまとめるための`docker-compose.yml`を作成すれば完成です。
+
+```yaml
+version: "3"
+
+services:
+
+  yourapp:
+    container_name: yourapp
+    build:
+      context: .
+      dockerfile: containers/yourapp/Dockerfile
+    expose:
+      - "3031"
+    # !!! その他の設定はアプリケーションに応じて行なってください !!!
+
+  mecab:
+    container_name: mecablr
+    build:
+      context: ./containers/mecablr
+    expose:
+      - "3032"
+    environment:
+      TZ: "Asia/Tokyo"
+
+  proxy:
+    container_name: proxy
+    build:
+      context: .
+      dockerfile: containers/proxy/Dockerfile
+    volumes:
+      - ./containers/proxy/nginx.conf:/etc/nginx/nginx.conf
+      - ./containers/proxy/log/nginx:/var/log/nginx
+    links:
+      - yourapp
+      - mecablr
+    ports:
+      - "3193:80"  # Host:Container
+    environment:
+      TZ: "Asia/Tokyo"
+```
+
+プロジェクトルートに移動し、`docker-compose up -d`などのコマンドを実行してサービスを起動してみましょう。
 
 ## Alpine Linux
 今回作成するMeCabのサービスは、Alpine Linuxという名称の軽量化されたOSイメージの上に構築されます。
