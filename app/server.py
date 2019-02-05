@@ -30,21 +30,22 @@ def parse():
     """
     # STEP.1 Extraction of a given sentence
     sentence: Optional[str] = None
-    if request.method == 'POST':
-        data = request.data.decode('utf-8')
-        data = json.loads(data)
-        sentence = data.get('sentence')
-    else:
-        sentence = request.args.get('sentence')
+    try:
+        if request.method == 'POST':
+            sentence = request.json['sentence']
+        else:
+            sentence = request.args['sentence']
+    except KeyError:
+        abort(400, '`sentence` not found.')
     # STEP.2 Morphological Analysis
     result: Optional[str] = None
     if sentence is not None:
         parsed = mecab.parse(sentence)
         result = []
-        for line in parsed.split('\n')[:-2]:
+        for line in parsed.split('\n'):
             line = line.strip()
             elems = line.split('\t', 1)
-            if line == 'EOS':
+            if line == 'EOS' or len(elems) <= 1:
                 continue
             cols = ['Surface', 'PoS', 'PoS1', 'PoS2', 'PoS3',
                     'VerbConjugation', 'Original', 'Reading', 'Pronunciation']
